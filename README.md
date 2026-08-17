@@ -5,6 +5,8 @@
 [![CI](https://github.com/mateoosoriodelhonte/reposignal/actions/workflows/ci.yml/badge.svg)](https://github.com/mateoosoriodelhonte/reposignal/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
+**[Try it →](https://reposignal-lovat.vercel.app)** · [Scoring methodology](docs/SCORING.md) · [Architecture](ARCHITECTURE.md)
+
 RepoSignal takes a repository like `facebook/react` and reports how the project
 is actually being engineered — activity, pull request flow, issue backlog, CI,
 documentation, hygiene, and security practices — with every number traceable to
@@ -13,6 +15,12 @@ the public GitHub data it came from.
 ![A RepoSignal analysis of react/react, showing an overall score of 86 out of 100, seven category scores, and a banner explaining that branch protection could not be retrieved](docs/images/analysis.png)
 
 ---
+
+> **Live demo:** [reposignal-lovat.vercel.app](https://reposignal-lovat.vercel.app)
+>
+> The demo runs without a GitHub token, so it shares GitHub's unauthenticated
+> rate limit and may be temporarily unavailable under load. Running it locally
+> with a token — which needs no scopes — gives 5,000 requests an hour.
 
 ## Why this exists
 

@@ -13,6 +13,8 @@ analysis records the `scoringVersion` it was produced under.
 
 ### Added
 
+- Production deployment at https://reposignal-lovat.vercel.app
+
 - Distribution charts for open issue age, open pull request age, and commit
   activity — server-rendered SVG with an equivalent table for assistive
   technology, omitted entirely where there is too little data to draw one
