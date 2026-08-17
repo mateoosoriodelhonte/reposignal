@@ -1,0 +1,107 @@
+@import 'tailwindcss';
+
+/*
+ * RepoSignal's palette is deliberately restrained. This is a report, not a
+ * marketing page: one accent, a neutral ramp, and four semantic colors for
+ * severity. Severity is never communicated by color alone — every colored
+ * element is paired with a text label.
+ *
+ * All pairs below meet WCAG AA against their intended background.
+ */
+:root {
+  --background: #ffffff;
+  --surface: #f8fafc;
+  --surface-raised: #ffffff;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --foreground: #0f172a;
+  --muted: #475569;
+  --accent: #1d4ed8;
+  --accent-contrast: #ffffff;
+
+  --severity-high: #b91c1c;
+  --severity-medium: #b45309;
+  --severity-low: #0369a1;
+  --severity-info: #475569;
+
+  --score-strong: #15803d;
+  --score-moderate: #b45309;
+  --score-weak: #b91c1c;
+  --score-unknown: #64748b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0b1120;
+    --surface: #111827;
+    --surface-raised: #172033;
+    --border: #1f2b41;
+    --border-strong: #33415c;
+    --foreground: #e8eefb;
+    --muted: #a3b0c7;
+    --accent: #7aa2ff;
+    --accent-contrast: #0b1120;
+
+    --severity-high: #fca5a5;
+    --severity-medium: #fcd34d;
+    --severity-low: #7dd3fc;
+    --severity-info: #a3b0c7;
+
+    --score-strong: #6ee7a8;
+    --score-moderate: #fcd34d;
+    --score-weak: #fca5a5;
+    --score-unknown: #a3b0c7;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-border-subtle: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-contrast: var(--accent-contrast);
+
+  --color-severity-high: var(--severity-high);
+  --color-severity-medium: var(--severity-medium);
+  --color-severity-low: var(--severity-low);
+  --color-severity-info: var(--severity-info);
+
+  --color-score-strong: var(--score-strong);
+  --color-score-moderate: var(--score-moderate);
+  --color-score-weak: var(--score-weak);
+  --color-score-unknown: var(--score-unknown);
+
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* A visible, high-contrast focus ring on every interactive element. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

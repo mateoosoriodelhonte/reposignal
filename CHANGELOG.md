@@ -1,0 +1,24 @@
+# Changelog
+
+All notable changes to this project are documented here.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+Changes to scoring rules are called out separately, because they affect how
+results should be interpreted rather than how the software behaves. Every
+analysis records the `scoringVersion` it was produced under.
+
+## [Unreleased]
+
+### Added
+
+- Project bootstrap: Next.js 16 App Router, TypeScript in strict mode,
+  Tailwind CSS v4
+- Engineering standards: ESLint, Prettier, Vitest, Playwright, GitHub Actions CI
+- `PROJECT_SPEC.md` recording the approved architecture, scoring contract, and
+  product scope
+- Core domain types (`AnalysisResult`, `CategoryScore`, `Finding`,
+  `RepositorySnapshot`) establishing the null-preserving contract
+- Security headers and Content Security Policy
+- Contribution, security, and code of conduct documentation

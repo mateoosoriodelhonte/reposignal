@@ -1,0 +1,10 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Scoring methodology
+    url: https://github.com/mateoosoriodelhonte/reposignal/blob/main/docs/SCORING.md
+    about: >
+      Before reporting a score as wrong, check how it is calculated — every
+      threshold and weight is documented.
+  - name: Security vulnerability
+    url: https://github.com/mateoosoriodelhonte/reposignal/security/advisories/new
+    about: Report security issues privately, not as a public issue.

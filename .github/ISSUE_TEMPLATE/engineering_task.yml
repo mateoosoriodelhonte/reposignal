@@ -1,0 +1,40 @@
+name: Engineering task
+description: A unit of implementation work on the roadmap.
+labels: []
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is missing or wrong today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: >
+        What this task includes, and explicitly what it does not. Work outside
+        the stated scope belongs in its own issue.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Checkable statements that are true when this is done.
+      value: |
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+
+  - type: textarea
+    id: testing
+    attributes:
+      label: Testing expectations
+      description: What tests must exist for this to be considered complete?
+    validations:
+      required: true

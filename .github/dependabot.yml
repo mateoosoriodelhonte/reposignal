@@ -1,0 +1,31 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    groups:
+      # One PR per ecosystem area keeps the review queue legible instead of
+      # producing a dozen single-package bumps every week.
+      dev-tooling:
+        patterns:
+          - '@vitest/*'
+          - 'vitest'
+          - 'eslint*'
+          - 'prettier*'
+          - '@playwright/*'
+          - '@testing-library/*'
+      types:
+        patterns:
+          - '@types/*'
+
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: monthly
+    labels:
+      - dependencies
+      - infrastructure

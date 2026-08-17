@@ -1,0 +1,33 @@
+name: Feature request
+description: Propose a capability RepoSignal does not have yet.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What can a user not do today, and why does that matter?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What should RepoSignal do instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Available evidence
+      description: >
+        If this proposes a new metric or score, what public GitHub data would
+        it be derived from? RepoSignal only reports what it can observe, so a
+        metric without a public data source cannot be built.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
