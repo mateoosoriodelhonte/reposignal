@@ -141,7 +141,7 @@ npm run analyze -- facebook/react
 ## Testing
 
 ```bash
-npm test              # unit, integration, component — 454 tests
+npm test              # unit, integration, component — 477 tests
 npm run test:coverage # with coverage thresholds
 npm run test:e2e      # Playwright — 22 specs
 npm run lint
