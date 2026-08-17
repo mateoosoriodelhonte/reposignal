@@ -10,9 +10,7 @@ is actually being engineered — activity, pull request flow, issue backlog, CI,
 documentation, hygiene, and security practices — with every number traceable to
 the public GitHub data it came from.
 
-> **Status:** in active development toward v1.0. See the
-> [v1.0 milestone](https://github.com/mateoosoriodelhonte/reposignal/milestone/1)
-> for what is built and what is left.
+![A RepoSignal analysis of react/react, showing an overall score of 86 out of 100, seven category scores, and a banner explaining that branch protection could not be retrieved](docs/images/analysis.png)
 
 ---
 
@@ -23,9 +21,11 @@ the commit graph, and guessing. Star counts measure popularity, not health, and
 most "repo score" tools produce a number with no way to interrogate it.
 
 RepoSignal is built on the opposite premise: **a score you cannot audit is not
-worth showing.** Every category can be expanded to reveal the metrics examined,
-their raw values, the weights applied, the thresholds used, and the evidence
-links — and where the data was not available, it says so instead of guessing.
+worth showing.** Every category expands to reveal the metrics examined, their
+raw values, the weights applied, the thresholds used, and links to the evidence
+on GitHub.
+
+![The expanded methodology for Repository Activity, showing each scoring component with its rule, score, weight, and the observation behind it](docs/images/methodology.png)
 
 ## The rule that shapes the architecture
 
@@ -37,8 +37,14 @@ little data scores `null` rather than `0`, and a `null` category is excluded
 from the overall score with its weight redistributed across the categories that
 did produce one.
 
-Silently turning missing data into a zero is the single easiest way to make a
-health score dishonest, and avoiding it drove most of the type design.
+The consequence is asserted directly by a test: **adding a `null` category can
+never lower the overall score.**
+
+Silently turning missing data into a zero is the easiest way to make a health
+score dishonest, and avoiding it drove most of the type design. You can see it
+working in the screenshot above: branch protection needs permissions RepoSignal
+does not have, so it is reported as unverifiable and excluded — not counted as
+a failure.
 
 ## What it measures
 
@@ -54,7 +60,10 @@ health score dishonest, and avoiding it drove most of the type design.
 
 The last one is deliberately called _hygiene_, not _security score_. RepoSignal
 observes practices; it does not scan for vulnerabilities and will never claim a
-repository is secure.
+repository is secure. There is a test that collects every user-facing string in
+that module and asserts none of them says so.
+
+Every threshold and formula is documented in [docs/SCORING.md](docs/SCORING.md).
 
 ## What it deliberately does not do
 
@@ -68,7 +77,7 @@ repository is secure.
 
 ```mermaid
 flowchart TD
-    A[GitHub REST API] --> B[GitHub Data Client<br/>auth · retry · timeouts · rate limits]
+    A[GitHub REST API] --> B[GitHub Data Client<br/>auth · retry · timeouts · rate limits · budget]
     B --> C[Normalization Layer<br/>GitHub payloads → domain types]
     C --> D[RepositorySnapshot<br/>the only input scoring ever sees]
     D --> E[Metrics Engine]
@@ -83,17 +92,18 @@ Two boundaries are enforced:
 
 1. **GitHub response shapes never escape normalization.** Nothing downstream
    references a GitHub-specific field name, so an API change is contained to one
-   directory.
+   directory — and the scoring engine can be tested with plain object literals
+   instead of recorded HTTP fixtures.
 2. **The UI calculates nothing.** If a number is on screen, a pure, tested
    scoring function produced it.
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design and
-[docs/SCORING.md](docs/SCORING.md) for every threshold and formula.
+[ARCHITECTURE.md](ARCHITECTURE.md) covers each layer and the reasoning behind it.
 
 ## Stack
 
-Next.js 16 (App Router) · React 19 · TypeScript (strict) · Tailwind CSS v4 ·
-PostgreSQL + Prisma · Zod · Vitest · React Testing Library · Playwright · MSW ·
+Next.js 16 (App Router) · React 19 · TypeScript (strict, plus
+`noUncheckedIndexedAccess` and `exactOptionalPropertyTypes`) · Tailwind CSS v4 ·
+PostgreSQL + Prisma 7 · Zod · Vitest · React Testing Library · Playwright · MSW ·
 GitHub Actions
 
 ## Local development
@@ -103,39 +113,44 @@ git clone https://github.com/mateoosoriodelhonte/reposignal.git
 cd reposignal
 npm install
 cp .env.example .env.local
-```
-
-Add a GitHub token to `.env.local`. It needs **no scopes** — RepoSignal reads
-only public data, and an unscoped token raises the rate limit from 60 to 5,000
-requests per hour:
-
-```bash
 echo "GITHUB_TOKEN=$(gh auth token)" >> .env.local
-```
-
-Then:
-
-```bash
 npm run dev
 ```
 
-Full setup, including the database, is in
-[docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md).
+The token needs **no scopes** — RepoSignal reads only public data, and an
+unscoped token exists solely to raise the rate limit from 60 to 5,000 requests
+per hour. **A database is optional**: without `DATABASE_URL`, analyses are
+cached in memory instead of surviving a restart.
+
+Full setup in [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md).
+
+You can also run the pipeline without the UI:
+
+```bash
+npm run analyze -- facebook/react
+```
 
 ## Testing
 
 ```bash
-npm test              # unit + integration
+npm test              # unit, integration, component — 454 tests
 npm run test:coverage # with coverage thresholds
-npm run test:e2e      # Playwright
+npm run test:e2e      # Playwright — 22 specs
 npm run lint
 npm run typecheck
 ```
 
-Tests never touch the live GitHub API. Unit tests run against fixtures,
-integration tests mock the network with MSW, and E2E runs the built app with
-bundled fixture snapshots. CI is therefore immune to GitHub rate limits and
-outages.
+| Layer       | Proves                                               |
+| ----------- | ---------------------------------------------------- |
+| Unit        | Every threshold and null path, in isolation          |
+| Integration | The layers compose, network mocked with MSW          |
+| Component   | Every UI state renders correctly                     |
+| E2E         | The journey works in a browser, against a real build |
+
+**No test contacts the live GitHub API.** Integration tests use MSW configured
+so an unhandled request fails the test rather than escaping; E2E runs the built
+app against bundled fixture snapshots. CI is therefore immune to rate limits
+and outages.
 
 ## Engineering decisions
 
@@ -146,47 +161,61 @@ choices did.
 
 A health score has to be reproducible and arguable. Deterministic scoring means
 the same snapshot always yields the same result, every threshold can be unit
-tested, and a user who disagrees with a score can be shown the exact rule that
-produced it. An LLM-generated score is none of those things. AI remains a
-possible _presentation_ layer — rephrasing finished findings — but it will never
-compute or adjust a number.
-
-### Why normalize GitHub responses?
-
-External API schemas should not define internal business logic. Normalization
-keeps GitHub's field names, pagination quirks, and inconsistencies inside one
-directory. The scoring engine — the part with the actual domain logic — depends
-only on types this project owns, so it can be tested with plain object literals
-instead of recorded HTTP fixtures.
+tested, and a user who disagrees can be shown the exact rule that produced the
+number. An LLM-generated score is none of those things. AI remains a possible
+_presentation_ layer — rephrasing finished findings — but it will never compute
+or adjust a number.
 
 ### Why preserve unknown values instead of defaulting to zero?
 
 Because the alternative is lying. Defaulting a missing value to `0` would
-penalize a repository for GitHub's incomplete statistics. This is why
-`score: number | null` appears throughout, and why `null` propagates all the way
-to a UI that renders "Insufficient data" rather than a number.
+penalize a repository for GitHub's incomplete statistics or for a permission
+RepoSignal does not have. This is why `score: number | null` appears
+throughout, and why `null` propagates all the way to a UI that renders
+"Insufficient data" rather than a number.
 
 ### Why a hand-written GitHub client instead of Octokit?
 
-RepoSignal needs specific policies: a hard per-analysis request budget, sample
-truncation recorded on the snapshot so it can lower a category's confidence,
-and rate-limit accounting that fails clearly rather than retrying into the wall.
-Expressing those on top of a general-purpose client meant fighting it. A thin
-typed `fetch` wrapper made the policies explicit and the whole layer trivially
-mockable.
-
-### Why no charting library?
-
-The charts are static distributions with no interactivity requirement. Rendering
-them as server-generated SVG ships zero client JavaScript and makes the
-accessible-text alternative a natural part of the markup rather than a retrofit.
+Three policies were the deciding factor, and all three are visible in the
+client's public signatures: a hard per-analysis request budget, sample
+truncation surfaced to the caller rather than hidden (`paginate` returns
+`{ items, truncated }`), and rate-limit handling that fails fast with a reset
+time instead of retrying into the wall. Expressing those on top of a
+general-purpose client meant fighting it.
 
 ### Why is repository identity the numeric ID?
 
 Repositories get renamed and transferred. `owner/name` is a mutable lookup key;
-GitHub's numeric `id` is the stable identity. Keying analysis history on the
-numeric id means a renamed repository keeps its history instead of silently
-forking into two records.
+GitHub's numeric `id` is the stable identity. This is not theoretical — while
+building this, `facebook/react` turned out to now be `react/react`, and GitHub
+301s the old path to the canonical one. Keying history on the numeric id means
+a rename resolves cleanly instead of forking into two records.
+
+### Why is every route dynamically rendered?
+
+Next.js streams Suspense boundaries through inline `<script>` tags, so a strict
+`script-src 'self'` policy blocks them — leaving every analysis stuck on its
+loading state while the streamed HTML underneath is perfectly correct. The
+alternatives were `'unsafe-inline'`, which defeats most of the point of a
+script CSP, or a per-request nonce. RepoSignal takes the nonce, and pays for it
+by giving up prerendering, since nonces are injected at render time.
+
+That is a real trade, recorded as one rather than presented as a free win.
+
+### Why no charting library?
+
+The charts are static distributions with no interactivity requirement.
+Server-rendered SVG ships zero client JavaScript and makes the accessible-text
+alternative a natural part of the markup rather than a retrofit.
+
+## Accessibility
+
+Semantic HTML throughout, a skip link, visible focus states, labelled form
+controls, and WCAG AA contrast. **Score is never communicated by colour alone**
+— every score carries a number and a text band. The methodology disclosure is a
+native `<details>` element, so it is keyboard operable and announced correctly
+without any custom ARIA. E2E asserts a keyboard-only path through the primary
+journey and that the page never scrolls horizontally at 375px.
 
 ## Roadmap
 

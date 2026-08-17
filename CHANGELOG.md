@@ -13,6 +13,11 @@ analysis records the `scoringVersion` it was produced under.
 
 ### Added
 
+- Complete documentation: `docs/SCORING.md` documenting every weight,
+  threshold, and formula with its rationale and a worked example of weight
+  redistribution; `ARCHITECTURE.md`; `docs/LOCAL_DEVELOPMENT.md`; README
+  screenshots captured from a real analysis
+
 - Component tests for every UI state, integration tests covering the full
   pipeline with MSW, and a Playwright end-to-end suite running against bundled
   fixtures — 451 tests in total
