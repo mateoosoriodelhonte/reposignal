@@ -1,4 +1,4 @@
-import type { AnalysisResult, CategoryScore, Finding, Severity } from '@/types/analysis';
+import type { AnalysisResult, CategoryScore, Severity } from '@/types/analysis';
 import type { RepositorySnapshot } from '@/types/snapshot';
 
 import { scoreActivity } from './activity';
