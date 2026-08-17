@@ -13,6 +13,10 @@ analysis records the `scoringVersion` it was produced under.
 
 ### Added
 
+- Repository input validation: a Zod-backed parser that accepts `owner/repo`,
+  GitHub URLs, deep links, and `git@` remotes, and rejects everything else.
+  This is the SSRF boundary — only a validated `{ owner, name }` pair reaches
+  URL construction
 - Project bootstrap: Next.js 16 App Router, TypeScript in strict mode,
   Tailwind CSS v4
 - Engineering standards: ESLint, Prettier, Vitest, Playwright, GitHub Actions CI

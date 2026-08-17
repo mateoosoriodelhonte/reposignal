@@ -59,17 +59,8 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      # Coverage thresholds are meaningless with no suites, and would fail on
-      # an empty report. The guard disappears with the first test PR (#23).
       - name: Unit and integration tests
-        run: |
-          if compgen -G "tests/unit/**/*.test.ts" > /dev/null \
-            || compgen -G "tests/integration/**/*.test.ts" > /dev/null; then
-            npm run test:coverage
-          else
-            echo "No test suites yet — skipping."
-          fi
-        shell: bash
+        run: npm run test:coverage
 
       - name: Build
         run: npm run build
