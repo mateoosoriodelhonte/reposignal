@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { usingFixtures } from '@/lib/github/fixtures';
 import { logger } from '@/lib/logging/logger';
 import { RateLimiter } from '@/lib/rate-limit';
 import { MemoryAnalysisStore } from '@/lib/store/memory-store';
@@ -54,6 +55,8 @@ export async function getAnalysisService(): Promise<AnalysisService> {
   service = new AnalysisService({
     store: await resolveStore(),
     logger,
+    // The one place `GITHUB_FIXTURES` is read.
+    useFixtures: usingFixtures(),
     ...(Number.isFinite(freshness) && freshness > 0
       ? { freshnessMinutes: freshness }
       : {}),

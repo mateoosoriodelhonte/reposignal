@@ -1,7 +1,7 @@
 import { GitHubClient } from '@/lib/github/client';
 import { collectSnapshot } from '@/lib/github/collector';
 import { GitHubError, isRateLimitError } from '@/lib/github/errors';
-import { fixtureSnapshot, usingFixtures } from '@/lib/github/fixtures';
+import { fixtureSnapshot } from '@/lib/github/fixtures';
 import { RequestBudget } from '@/lib/github/request-budget';
 import type { Logger } from '@/lib/logging/logger';
 import { analyzeSnapshot } from '@/lib/scoring';
@@ -48,6 +48,16 @@ export interface AnalysisServiceOptions {
   generateId?: () => string;
   /** Injected for tests. */
   createClient?: (budget: RequestBudget) => GitHubClient;
+  /**
+   * Serve bundled fixtures instead of calling GitHub.
+   *
+   * An explicit option rather than a read of `process.env` inside the service:
+   * the environment variable is resolved once, in the container, so a test or
+   * another caller cannot be silently switched into fixture mode by ambient
+   * state. That exact leak broke the unit suite in CI when the workflow set
+   * `GITHUB_FIXTURES` for every job.
+   */
+  useFixtures?: boolean;
 }
 
 export class AnalysisService {
@@ -172,7 +182,7 @@ export class AnalysisService {
     now: Date,
     fullName: string,
   ): Promise<RepositorySnapshot> {
-    if (!usingFixtures()) {
+    if (this.options.useFixtures !== true) {
       return collectSnapshot(client, reference, now);
     }
 
