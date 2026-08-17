@@ -11,22 +11,26 @@ analysis records the `scoringVersion` it was produced under.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-08-17
+
+Initial release. RepoSignal analyzes a public GitHub repository and reports
+engineering health across seven categories, with every score traceable to the
+public data it came from.
+
 ### Added
 
 - Production deployment at https://reposignal-lovat.vercel.app
-
 - Distribution charts for open issue age, open pull request age, and commit
   activity — server-rendered SVG with an equivalent table for assistive
   technology, omitted entirely where there is too little data to draw one
-
 - Complete documentation: `docs/SCORING.md` documenting every weight,
   threshold, and formula with its rationale and a worked example of weight
   redistribution; `ARCHITECTURE.md`; `docs/LOCAL_DEVELOPMENT.md`; README
   screenshots captured from a real analysis
-
 - Component tests for every UI state, integration tests covering the full
   pipeline with MSW, and a Playwright end-to-end suite running against bundled
-  fixtures — 451 tests in total
+  fixtures — 477 unit, integration, and component tests plus 22 end-to-end
+  specs
 - A malformed repository path now returns a real 404 status rather than
   rendering the not-found page under a 200
 - Analysis orchestration with a 15-minute cache freshness window, in-flight
@@ -62,3 +66,6 @@ analysis records the `scoringVersion` it was produced under.
   `RepositorySnapshot`) establishing the null-preserving contract
 - Security headers and Content Security Policy
 - Contribution, security, and code of conduct documentation
+
+[unreleased]: https://github.com/mateoosoriodelhonte/reposignal/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/mateoosoriodelhonte/reposignal/releases/tag/v1.0.0

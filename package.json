@@ -1,6 +1,6 @@
 {
   "name": "reposignal",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Evidence-backed engineering health analysis for public GitHub repositories.",
   "license": "MIT",
