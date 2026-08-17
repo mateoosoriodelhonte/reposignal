@@ -45,7 +45,15 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'lcov'],
       include: ['src/lib/**/*.ts'],
-      exclude: ['src/lib/**/index.ts', 'src/lib/store/prisma-*.ts'],
+      // Excluded because they are wiring, not logic: `container.ts` reads
+      // environment variables and picks an implementation, and the Prisma
+      // store needs a live database. Both are exercised by E2E rather than
+      // by unit tests, and covering them here would mean testing mocks.
+      exclude: [
+        'src/lib/**/index.ts',
+        'src/lib/store/prisma-*.ts',
+        'src/lib/analysis/container.ts',
+      ],
       thresholds: {
         // The scoring and normalization layers are the correctness core of the
         // product, so the bar is set against src/lib rather than the whole app.

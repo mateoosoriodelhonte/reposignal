@@ -1,0 +1,63 @@
+// RepoSignal data model.
+//
+// Two decisions drive this schema:
+//
+// 1. Repository identity is GitHub's immutable numeric id, not `owner/name`.
+//    Repositories get renamed and transferred; keying on the mutable name
+//    would silently fork one project's history into two records.
+//
+// 2. Analyses are append-only. Re-analysis inserts a new row rather than
+//    updating one, so a cache read is "the most recent row, if fresh enough",
+//    and historical score tracking needs no schema change to add later.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+
+}
+
+model Repository {
+  /// GitHub's numeric id. The stable identity across renames and transfers.
+  githubId  BigInt     @id
+  /// Current owner and name. Mutable — a lookup key, not an identity.
+  owner     String
+  name      String
+  fullName  String
+  firstSeen DateTime   @default(now())
+  lastSeen  DateTime   @updatedAt
+  analyses  Analysis[]
+
+  /// Not unique: a rename can leave a stale row pointing at the same name
+  /// until the new owner is analyzed, and failing that write would be worse
+  /// than briefly holding two rows.
+  @@index([fullName])
+  @@map("repositories")
+}
+
+model Analysis {
+  id           String     @id @default(uuid())
+  repository   Repository @relation(fields: [repositoryId], references: [githubId], onDelete: Cascade)
+  repositoryId BigInt
+
+  /// Overall score, nullable because "not enough data to score" is a real
+  /// outcome that must never be stored as zero.
+  overallScore Int?
+  /// The algorithm version that produced this result, so a stored analysis
+  /// stays interpretable after the scoring rules change.
+  scoringVersion String
+
+  /// The full AnalysisResult and the RepositorySnapshot it was derived from.
+  /// Stored whole so a cached analysis can be re-rendered without re-scoring,
+  /// and so a historical result can be re-examined against new rules.
+  result   Json
+  snapshot Json
+
+  createdAt DateTime @default(now())
+
+  /// The cache read: most recent analysis for a repository.
+  @@index([repositoryId, createdAt])
+  @@map("analyses")
+}

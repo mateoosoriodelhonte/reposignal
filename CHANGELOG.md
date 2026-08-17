@@ -13,6 +13,13 @@ analysis records the `scoringVersion` it was produced under.
 
 ### Added
 
+- Analysis orchestration with a 15-minute cache freshness window, in-flight
+  request deduplication, and invalidation when `scoringVersion` changes
+- Persistence: a Prisma/PostgreSQL store keyed on GitHub's immutable numeric
+  repository id, with an in-memory fallback so the application runs without a
+  database
+- Structured JSON logging correlated by analysis id, and per-client rate
+  limiting
 - Scoring engine (`scoringVersion` 1.0.0): seven pure category scorers —
   activity, pull requests, issues, CI, documentation, repository hygiene, and
   security hygiene — plus the overall engine that renormalizes declared weights
