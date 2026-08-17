@@ -1,21 +1,26 @@
 import react from '@vitejs/plugin-react';
-import tsconfigPaths from 'vite-tsconfig-paths';
 import { defineConfig } from 'vitest/config';
 
 /**
  * Two projects, because they need different environments:
  *
- * - `node`   — scoring, normalization, and the GitHub client. These are pure
- *              and must never require a DOM to run.
- * - `jsdom`  — React component tests.
+ * - `node`       — scoring, normalization, and the GitHub client. These are
+ *                  pure and must never require a DOM to run.
+ * - `components` — React component tests, under jsdom.
  *
  * Playwright specs in `tests/e2e` are run separately by `npm run test:e2e`.
+ *
+ * The `.mts` extension is deliberate: it lets Vite load this config as real
+ * ESM instead of transpiling it as CommonJS.
  */
 export default defineConfig({
+  // Resolves the `@/*` alias from tsconfig.json natively, which is why
+  // vite-tsconfig-paths is not a dependency of this project.
+  resolve: { tsconfigPaths: true },
   test: {
     projects: [
       {
-        plugins: [tsconfigPaths()],
+        resolve: { tsconfigPaths: true },
         test: {
           name: 'node',
           globals: true,
@@ -25,7 +30,8 @@ export default defineConfig({
         },
       },
       {
-        plugins: [tsconfigPaths(), react()],
+        plugins: [react()],
+        resolve: { tsconfigPaths: true },
         test: {
           name: 'components',
           globals: true,
