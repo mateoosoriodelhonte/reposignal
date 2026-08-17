@@ -13,6 +13,11 @@ analysis records the `scoringVersion` it was produced under.
 
 ### Added
 
+- Component tests for every UI state, integration tests covering the full
+  pipeline with MSW, and a Playwright end-to-end suite running against bundled
+  fixtures — 451 tests in total
+- A malformed repository path now returns a real 404 status rather than
+  rendering the not-found page under a 200
 - Analysis orchestration with a 15-minute cache freshness window, in-flight
   request deduplication, and invalidation when `scoringVersion` changes
 - Persistence: a Prisma/PostgreSQL store keyed on GitHub's immutable numeric

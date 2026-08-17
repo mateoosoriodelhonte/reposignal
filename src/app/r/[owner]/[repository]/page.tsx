@@ -7,7 +7,11 @@ import { CategoryCard } from '@/components/category-card';
 import { FindingsList } from '@/components/findings';
 import { CategoryScoreBar, OverallScore } from '@/components/score-display';
 import { getAnalysisService } from '@/lib/analysis/container';
-import { parseRepositoryReference } from '@/lib/validation/repository-reference';
+import {
+  formatRepositoryReference,
+  parseRepositoryReference,
+  type RepositoryReference,
+} from '@/lib/validation/repository-reference';
 import type { AnalysisResult } from '@/types/analysis';
 
 /**
@@ -37,30 +41,41 @@ export async function generateMetadata(
   };
 }
 
-export default function AnalysisPage(props: PageProps<'/r/[owner]/[repository]'>) {
+/**
+ * Route params are validated here, above the Suspense boundary, rather than
+ * inside it.
+ *
+ * `notFound()` can only set a 404 status while the response headers are still
+ * open. Called from inside a streaming boundary the shell has already been
+ * sent with a 200, so a malformed URL would render the not-found page under a
+ * success status — wrong for crawlers, monitoring, and anything reading the
+ * status rather than the body.
+ *
+ * The cost is that the shell waits on `params`, which is negligible: they are
+ * already resolved by the time the route runs.
+ */
+export default async function AnalysisPage(props: PageProps<'/r/[owner]/[repository]'>) {
+  const { owner, repository } = await props.params;
+
+  // Route segments are user input like any other, so they go through the same
+  // parser as the search form before anything is requested.
+  const parsed = parseRepositoryReference(`${owner}/${repository}`);
+  if (!parsed.ok) notFound();
+
   return (
     <Suspense fallback={<AnalysisSkeleton />}>
-      <AnalysisContent params={props.params} />
+      <AnalysisContent reference={parsed.value} />
     </Suspense>
   );
 }
 
-async function AnalysisContent({
-  params,
-}: Pick<PageProps<'/r/[owner]/[repository]'>, 'params'>) {
-  const { owner, repository } = await params;
-
-  // The route segments are user input like any other, so they go through the
-  // same parser as the search form before anything is requested.
-  const parsed = parseRepositoryReference(`${owner}/${repository}`);
-  if (!parsed.ok) notFound();
-
-  const fullName = `${parsed.value.owner}/${parsed.value.name}`;
+async function AnalysisContent({ reference }: { reference: RepositoryReference }) {
+  const fullName = formatRepositoryReference(reference);
   const service = await getAnalysisService();
 
   let outcome;
   try {
-    outcome = await service.analyze(parsed.value);
+    outcome = await service.analyze(reference);
   } catch (error) {
     return <AnalysisError error={error} repository={fullName} />;
   }

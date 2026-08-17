@@ -1,6 +1,7 @@
 import { GitHubClient } from '@/lib/github/client';
 import { collectSnapshot } from '@/lib/github/collector';
 import { GitHubError, isRateLimitError } from '@/lib/github/errors';
+import { fixtureSnapshot, usingFixtures } from '@/lib/github/fixtures';
 import { RequestBudget } from '@/lib/github/request-budget';
 import type { Logger } from '@/lib/logging/logger';
 import { analyzeSnapshot } from '@/lib/scoring';
@@ -11,6 +12,7 @@ import {
   type RepositoryReference,
 } from '@/lib/validation/repository-reference';
 import type { AnalysisResult } from '@/types/analysis';
+import type { RepositorySnapshot } from '@/types/snapshot';
 
 /**
  * Orchestrates one analysis: cache lookup, collection, scoring, persistence.
@@ -109,7 +111,7 @@ export class AnalysisService {
 
     try {
       const now = this.#now();
-      const snapshot = await collectSnapshot(client, reference, now);
+      const snapshot = await this.#collect(reference, client, now, fullName);
       const result = analyzeSnapshot(snapshot, { now, analysisId });
 
       // Persistence failure must not fail an analysis that already succeeded.
@@ -154,6 +156,34 @@ export class AnalysisService {
 
       throw error;
     }
+  }
+
+  /**
+   * Collects a snapshot, or serves a bundled one in fixture mode.
+   *
+   * Fixture mode exists so E2E can run against a production build without
+   * touching GitHub. An unknown repository in fixture mode raises the same
+   * `not_found` error the real client would, so the not-found path is
+   * exercised rather than special-cased.
+   */
+  async #collect(
+    reference: RepositoryReference,
+    client: GitHubClient,
+    now: Date,
+    fullName: string,
+  ): Promise<RepositorySnapshot> {
+    if (!usingFixtures()) {
+      return collectSnapshot(client, reference, now);
+    }
+
+    const fixture = fixtureSnapshot(reference, now);
+    if (fixture === null) {
+      throw new GitHubError('not_found', 'That repository could not be found.', {
+        status: 404,
+        resource: fullName,
+      });
+    }
+    return fixture;
   }
 
   async #readCache(fullName: string): Promise<AnalysisOutcome | null> {
