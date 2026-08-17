@@ -13,6 +13,11 @@ analysis records the `scoringVersion` it was produced under.
 
 ### Added
 
+- Scoring engine (`scoringVersion` 1.0.0): seven pure category scorers —
+  activity, pull requests, issues, CI, documentation, repository hygiene, and
+  security hygiene — plus the overall engine that renormalizes declared weights
+  across whichever categories produced a score. Null categories are excluded
+  and their weight redistributed; they never count as zero
 - Repository normalization layer: Zod-parsed GitHub payloads mapped into a
   `RepositorySnapshot`, with pull requests excluded from all issue data,
   unobservable values preserved as `null`, sample truncation recorded, and
