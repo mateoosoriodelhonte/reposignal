@@ -22,6 +22,12 @@ const DEFAULT_BUDGET = 40;
  */
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
+/**
+ * Redirect hops allowed per request. GitHub's canonicalization is one hop;
+ * more than a few means something is wrong.
+ */
+const MAX_REDIRECTS = 3;
+
 /** GitHub asks for an explicit API version and a descriptive user agent. */
 const BASE_HEADERS: Record<string, string> = {
   Accept: 'application/vnd.github+json',
@@ -64,6 +70,11 @@ export interface RequestOptions {
   etag?: string | null;
   /** Override the default Accept header, e.g. for raw file contents. */
   accept?: string;
+  /**
+   * How to read the body. `text` is needed for raw file contents, which
+   * GitHub returns as the file itself rather than as JSON.
+   */
+  parse?: 'json' | 'text';
   signal?: AbortSignal;
 }
 
@@ -197,10 +208,12 @@ export class GitHubClient {
       );
     }
 
-    const url = this.#buildUrl(options.path, options.searchParams);
+    let url = this.#buildUrl(options.path, options.searchParams);
+    let redirects = 0;
+    let attempt = 0;
     let lastError: unknown;
 
-    for (let attempt = 0; attempt <= this.#maxRetries; attempt += 1) {
+    for (;;) {
       const timeout = AbortSignal.timeout(this.#timeoutMs);
       const signal = options.signal
         ? AbortSignal.any([options.signal, timeout])
@@ -212,8 +225,9 @@ export class GitHubClient {
           method: 'GET',
           headers: this.#headers(options),
           signal,
-          // A redirect off api.github.com would defeat the SSRF boundary, so
-          // it is surfaced as an error rather than followed.
+          // Redirects are followed manually so each hop's target can be
+          // checked against the API origin. Letting fetch follow them
+          // automatically would allow a redirect off api.github.com.
           redirect: 'manual',
         });
       } catch (cause) {
@@ -228,6 +242,7 @@ export class GitHubClient {
         lastError = cause;
         if (attempt < this.#maxRetries) {
           await this.#sleep(this.#backoffMs(attempt));
+          attempt += 1;
           continue;
         }
 
@@ -253,16 +268,18 @@ export class GitHubClient {
       }
 
       if (REDIRECT_STATUSES.has(response.status)) {
-        throw new GitHubError('unexpected', 'GitHub redirected the request.', {
-          status: response.status,
-          resource: options.path,
-        });
+        url = this.#resolveRedirect(response, url, options.path, redirects);
+        redirects += 1;
+        continue;
       }
 
       if (response.ok) {
         let data: T;
         try {
-          data = (await response.json()) as T;
+          data =
+            options.parse === 'text'
+              ? ((await response.text()) as T)
+              : ((await response.json()) as T);
         } catch (cause) {
           throw new GitHubError('invalid_response', 'GitHub returned malformed JSON.', {
             status: response.status,
@@ -282,6 +299,7 @@ export class GitHubClient {
       // Retry server errors only. A 4xx will not become a 2xx by asking again.
       if (response.status >= 500 && attempt < this.#maxRetries) {
         await this.#sleep(this.#backoffMs(attempt));
+        attempt += 1;
         continue;
       }
 
@@ -293,6 +311,61 @@ export class GitHubClient {
       resource: options.path,
       cause: lastError,
     });
+  }
+
+  /**
+   * Validates a redirect target and returns it.
+   *
+   * GitHub legitimately redirects `repos/{owner}/{name}` to its canonical
+   * `repositories/{id}` URL for any repository that has ever been renamed or
+   * transferred — `facebook/react` among them. Refusing all redirects made
+   * those repositories unanalyzable.
+   *
+   * The SSRF concern was never same-origin canonicalization; it is a redirect
+   * to a *different* host. So each hop is resolved and its origin checked
+   * against the API base, and the hop count is bounded so a redirect loop
+   * cannot spin.
+   */
+  #resolveRedirect(
+    response: Response,
+    currentUrl: string,
+    resource: string,
+    redirectsSoFar: number,
+  ): string {
+    if (redirectsSoFar >= MAX_REDIRECTS) {
+      throw new GitHubError('unexpected', 'GitHub redirected too many times.', {
+        status: response.status,
+        resource,
+      });
+    }
+
+    const location = response.headers.get('location');
+    if (location === null || location === '') {
+      throw new GitHubError('unexpected', 'GitHub redirected without a target.', {
+        status: response.status,
+        resource,
+      });
+    }
+
+    let target: URL;
+    try {
+      target = new URL(location, currentUrl);
+    } catch {
+      throw new GitHubError('unexpected', 'GitHub redirected to an invalid target.', {
+        status: response.status,
+        resource,
+      });
+    }
+
+    if (target.origin !== API_BASE) {
+      throw new GitHubError(
+        'unexpected',
+        'Refusing to follow a redirect away from the GitHub API.',
+        { status: response.status, resource },
+      );
+    }
+
+    return target.toString();
   }
 
   #toError(response: Response, resource: string): GitHubError {

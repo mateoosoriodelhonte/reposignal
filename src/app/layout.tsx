@@ -2,6 +2,16 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import './globals.css';
 
+/**
+ * Every route renders dynamically.
+ *
+ * The nonce in the Content Security Policy (see `src/proxy.ts`) is injected
+ * during rendering, so a prerendered page would carry a nonce that no longer
+ * matches the header its visitor receives, and its scripts would be blocked.
+ * Prerendering the homepage is the price of a strict script policy.
+ */
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: {
     default: 'RepoSignal — GitHub engineering health analysis',

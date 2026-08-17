@@ -41,6 +41,11 @@ const eslintConfig = defineConfig([
     files: ['tests/**/*.{ts,tsx}'],
     rules: { '@typescript-eslint/no-explicit-any': 'off' },
   },
+  {
+    // Command-line tools write to stdout; that is their interface.
+    files: ['scripts/**/*.{ts,mts}'],
+    rules: { 'no-console': 'off' },
+  },
 ]);
 
 export default eslintConfig;

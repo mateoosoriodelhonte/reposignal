@@ -1,29 +1,14 @@
 import type { NextConfig } from 'next';
 
 /**
- * Content Security Policy.
+ * Static security headers.
  *
- * RepoSignal renders only its own markup and server-generated inline SVG, so
- * the policy can be tight. `'unsafe-inline'` is required for styles because
- * Next.js injects inline style tags for streaming; scripts do not need it in
- * production, where Next emits external bundles only.
+ * The Content Security Policy is deliberately *not* here: it needs a fresh
+ * nonce per request, so it is set in `src/proxy.ts` instead. A static CSP
+ * cannot carry a nonce, and without one Next.js's streaming inline scripts are
+ * blocked.
  */
-const contentSecurityPolicy = [
-  "default-src 'self'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-  "object-src 'none'",
-  "img-src 'self' data: https://avatars.githubusercontent.com",
-  "style-src 'self' 'unsafe-inline'",
-  `script-src 'self'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
-  "connect-src 'self'",
-  "font-src 'self'",
-  'upgrade-insecure-requests',
-].join('; ');
-
 const securityHeaders = [
-  { key: 'Content-Security-Policy', value: contentSecurityPolicy },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'X-Frame-Options', value: 'DENY' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
