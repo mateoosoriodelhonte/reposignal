@@ -13,6 +13,10 @@ analysis records the `scoringVersion` it was produced under.
 
 ### Added
 
+- Repository normalization layer: Zod-parsed GitHub payloads mapped into a
+  `RepositorySnapshot`, with pull requests excluded from all issue data,
+  unobservable values preserved as `null`, sample truncation recorded, and
+  per-endpoint failures collected rather than aborting the analysis
 - GitHub API client: a typed `fetch` wrapper with bearer auth, per-request
   timeouts, bounded jittered retry on 5xx and network errors only, rate-limit
   accounting with reset times, ETag conditional requests, a hard per-analysis
