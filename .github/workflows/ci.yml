@@ -14,11 +14,6 @@ concurrency:
 permissions:
   contents: read
 
-env:
-  # CI must never depend on the live GitHub API or on rate limits. The client
-  # reads this and serves bundled fixtures instead.
-  GITHUB_FIXTURES: '1'
-
 jobs:
   verify:
     name: Lint, typecheck, test, build

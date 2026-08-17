@@ -288,6 +288,41 @@ describe('AnalysisService', () => {
     });
   });
 
+  describe('fixture mode', () => {
+    it('calls GitHub unless fixtures are explicitly requested', async () => {
+      // Regression: fixture mode was read from `process.env` inside the
+      // service, so a workflow-wide GITHUB_FIXTURES silently redirected the
+      // unit suite to bundled data and every test analyzing acme/widget
+      // failed with not_found. It is now an explicit option.
+      vi.stubEnv('GITHUB_FIXTURES', '1');
+
+      const { service, githubCalls } = makeService();
+      const outcome = await service.analyze(REF);
+
+      expect(outcome.result.repository.fullName).toBe('acme/widget');
+      expect(githubCalls()).toBeGreaterThan(0);
+
+      vi.unstubAllEnvs();
+    });
+
+    it('serves a bundled snapshot when fixtures are requested', async () => {
+      const { service, githubCalls } = makeService({ useFixtures: true });
+      const outcome = await service.analyze({ owner: 'acme', name: 'toolkit' });
+
+      expect(outcome.result.repository.fullName).toBe('acme/toolkit');
+      expect(githubCalls()).toBe(0);
+    });
+
+    it('reports an unknown repository as not found in fixture mode', async () => {
+      const { service } = makeService({ useFixtures: true });
+      await expect(
+        service.analyze({ owner: 'acme', name: 'nope' }),
+      ).rejects.toMatchObject({
+        kind: 'not_found',
+      });
+    });
+  });
+
   describe('logging', () => {
     it('logs the start and completion of an analysis with a shared id', async () => {
       const { service, records } = makeService();
