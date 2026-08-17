@@ -13,6 +13,10 @@ analysis records the `scoringVersion` it was produced under.
 
 ### Added
 
+- GitHub API client: a typed `fetch` wrapper with bearer auth, per-request
+  timeouts, bounded jittered retry on 5xx and network errors only, rate-limit
+  accounting with reset times, ETag conditional requests, a hard per-analysis
+  request budget, and truncation-aware pagination
 - Repository input validation: a Zod-backed parser that accepts `owner/repo`,
   GitHub URLs, deep links, and `git@` remotes, and rejects everything else.
   This is the SSRF boundary — only a validated `{ owner, name }` pair reaches
