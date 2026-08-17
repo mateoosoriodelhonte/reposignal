@@ -108,12 +108,74 @@ describe('GitHubClient request construction', () => {
     expect(new Headers(calls[0]?.init.headers).get('if-none-match')).toBe('W/"abc"');
   });
 
-  it('does not follow redirects, which would escape the API host', async () => {
-    const { client } = makeClient([
-      new Response(null, { status: 302, headers: { location: 'https://evil.com' } }),
-    ]);
-    await expect(client.request({ path: 'repos/a/b' })).rejects.toMatchObject({
-      kind: 'unexpected',
+  describe('redirects', () => {
+    it('follows a same-origin redirect to GitHub’s canonical URL', async () => {
+      // GitHub 301s `repos/{owner}/{name}` to `repositories/{id}` for any
+      // repository that has ever been renamed or transferred — facebook/react
+      // among them. Refusing this made those repositories unanalyzable.
+      const { client, calls } = makeClient([
+        new Response(null, {
+          status: 301,
+          headers: { location: 'https://api.github.com/repositories/10270250' },
+        }),
+        json({ id: 10270250 }),
+      ]);
+
+      const response = await client.request<{ id: number }>({
+        path: 'repos/facebook/react',
+      });
+
+      expect(response.data).toEqual({ id: 10270250 });
+      expect(calls[1]?.url).toBe('https://api.github.com/repositories/10270250');
+    });
+
+    it('counts a redirected request once against the budget', async () => {
+      const { client } = makeClient([
+        new Response(null, {
+          status: 301,
+          headers: { location: 'https://api.github.com/repositories/1' },
+        }),
+        json({ id: 1 }),
+      ]);
+
+      await client.request({ path: 'repos/a/b' });
+      expect(client.budget.spent).toBe(1);
+    });
+
+    it.each([
+      ['a different host', 'https://evil.com/repos/a/b'],
+      ['a lookalike host', 'https://api.github.com.evil.com/repos/a/b'],
+      ['a non-API GitHub host', 'https://github.com/a/b'],
+    ])('refuses to follow a redirect to %s', async (_label, location) => {
+      const { client } = makeClient([
+        new Response(null, { status: 302, headers: { location } }),
+      ]);
+
+      await expect(client.request({ path: 'repos/a/b' })).rejects.toMatchObject({
+        kind: 'unexpected',
+      });
+    });
+
+    it('rejects a redirect with no target', async () => {
+      const { client } = makeClient([new Response(null, { status: 301 })]);
+      await expect(client.request({ path: 'repos/a/b' })).rejects.toMatchObject({
+        kind: 'unexpected',
+      });
+    });
+
+    it('stops rather than looping forever', async () => {
+      const { client, calls } = makeClient([
+        new Response(null, {
+          status: 301,
+          headers: { location: 'https://api.github.com/loop' },
+        }),
+      ]);
+
+      await expect(client.request({ path: 'repos/a/b' })).rejects.toMatchObject({
+        kind: 'unexpected',
+      });
+      // Bounded: the initial request plus the allowed hops, then it gives up.
+      expect(calls.length).toBeLessThanOrEqual(5);
     });
   });
 });

@@ -143,15 +143,121 @@ export async function collectSnapshot(
   const repository = repositorySchema.parse(repositoryResponse.data);
   const identity = normalizeIdentity(repository);
 
-  const rootEntries =
-    (await collector.attempt('contents', () =>
-      listDirectory(client, `${base}/contents`),
-    )) ?? [];
+  // Everything below depends only on the repository call above, so the
+  // independent collections run concurrently. Sequentially this took ~14s on a
+  // large repository; concurrently it is a few seconds. The request budget is
+  // still enforced per request, so concurrency cannot overspend it.
+  const [
+    rootEntries,
+    githubDirEntries,
+    workflowFiles,
+    issuesResult,
+    pullsResult,
+    releasesResult,
+    tagCount,
+    contributorCount,
+    weeklyCommits,
+    workflows,
+    runs,
+    commitStatus,
+    branchProtected,
+  ] = await Promise.all([
+    collector
+      .attempt('contents', () => listDirectory(client, `${base}/contents`))
+      .then((entries) => entries ?? []),
 
-  const githubDirEntries =
-    (await collector.attempt('contents/.github', () =>
-      listDirectory(client, `${base}/contents/.github`),
-    )) ?? [];
+    collector
+      .attempt('contents/.github', () =>
+        listDirectory(client, `${base}/contents/.github`),
+      )
+      .then((entries) => entries ?? []),
+
+    collector
+      .attempt('contents/.github/workflows', () =>
+        listDirectory(client, `${base}/contents/.github/workflows`),
+      )
+      .then((entries) => entries ?? []),
+
+    collector.attempt('issues', () =>
+      client.paginate<unknown>({
+        path: `${base}/issues`,
+        searchParams: { state: 'all', sort: 'created', direction: 'desc' },
+        maxItems: SAMPLE_LIMITS.issues,
+      }),
+    ),
+
+    collector.attempt('pulls', () =>
+      client.paginate<unknown>({
+        path: `${base}/pulls`,
+        searchParams: { state: 'all', sort: 'created', direction: 'desc' },
+        maxItems: SAMPLE_LIMITS.pullRequests,
+      }),
+    ),
+
+    collector.attempt('releases', () =>
+      client.paginate<unknown>({
+        path: `${base}/releases`,
+        maxItems: SAMPLE_LIMITS.releases,
+      }),
+    ),
+
+    collector.attempt('tags', () => countViaPagination(client, `${base}/tags`)),
+
+    collector.attempt('contributors', () =>
+      countViaPagination(client, `${base}/contributors`),
+    ),
+
+    collector.attempt('stats/commit_activity', async () => {
+      const response = await client.request<unknown>({
+        path: `${base}/stats/commit_activity`,
+      });
+      // GitHub answers 202 with no body while it computes statistics. That is
+      // "not yet known", which must stay null rather than becoming zero commits.
+      if (response.status === 202 || response.data === null) return null;
+
+      const parsed = commitActivitySchema.safeParse(response.data);
+      return parsed.success ? parsed.data.map((week) => week.total) : null;
+    }),
+
+    collector.attempt('actions/workflows', async () => {
+      const response = await client.request<unknown>({
+        path: `${base}/actions/workflows`,
+      });
+      return workflowListSchema.safeParse(response.data);
+    }),
+
+    collector.attempt('actions/runs', async () => {
+      const response = await client.request<unknown>({
+        path: `${base}/actions/runs`,
+        searchParams: {
+          branch: identity.defaultBranch,
+          per_page: SAMPLE_LIMITS.workflowRuns,
+        },
+      });
+      return workflowRunListSchema.safeParse(response.data);
+    }),
+
+    collector.attempt('commit status', async () => {
+      const response = await client.request<unknown>({
+        path: `${base}/commits/${identity.defaultBranch}/status`,
+      });
+      const parsed = combinedStatusSchema.safeParse(response.data);
+      if (!parsed.success) return null;
+      // `pending` with no checks at all means there is no CI on this commit,
+      // which is different from a check that is still running.
+      return parsed.data.total_count === 0 ? 'none' : parsed.data.state;
+    }),
+
+    // Branch protection requires elevated permissions on most repositories.
+    // A 403 or 404 here is expected and must stay `null` — "unable to verify" —
+    // rather than being recorded as "not protected".
+    collector.attempt('branch protection', async () => {
+      await client.request<unknown>({
+        path: `${base}/branches/${identity.defaultBranch}/protection`,
+      });
+      return true;
+    }),
+  ]);
 
   const hasIssueTemplates = githubDirEntries.some(
     (entry) => entry.type === 'dir' && entry.name.toLowerCase() === 'issue_template',
@@ -164,104 +270,21 @@ export async function collectSnapshot(
 
   // Workflow file contents are read as text to detect security scanning steps.
   // Nothing is executed or evaluated — see SECURITY.md.
-  const workflowFiles =
-    (await collector.attempt('contents/.github/workflows', () =>
-      listDirectory(client, `${base}/contents/.github/workflows`),
-    )) ?? [];
-
-  const workflowContents: string[] = [];
-  for (const entry of workflowFiles.slice(0, SAMPLE_LIMITS.workflowFiles)) {
-    const content = await collector.attempt(`workflow:${entry.name}`, async () => {
-      const response = await client.request<unknown>({
-        path: `${base}/contents/${entry.path}`,
-        accept: 'application/vnd.github.raw+json',
-      });
-      return typeof response.data === 'string'
-        ? response.data
-        : JSON.stringify(response.data);
-    });
-    if (content !== null) workflowContents.push(content);
-  }
-
-  const issuesResult = await collector.attempt('issues', () =>
-    client.paginate<unknown>({
-      path: `${base}/issues`,
-      searchParams: { state: 'all', sort: 'created', direction: 'desc' },
-      maxItems: SAMPLE_LIMITS.issues,
-    }),
-  );
-
-  const pullsResult = await collector.attempt('pulls', () =>
-    client.paginate<unknown>({
-      path: `${base}/pulls`,
-      searchParams: { state: 'all', sort: 'created', direction: 'desc' },
-      maxItems: SAMPLE_LIMITS.pullRequests,
-    }),
-  );
-
-  const releasesResult = await collector.attempt('releases', () =>
-    client.paginate<unknown>({
-      path: `${base}/releases`,
-      maxItems: SAMPLE_LIMITS.releases,
-    }),
-  );
-
-  const tagCount = await collector.attempt('tags', () =>
-    countViaPagination(client, `${base}/tags`),
-  );
-
-  const contributorCount = await collector.attempt('contributors', () =>
-    countViaPagination(client, `${base}/contributors`),
-  );
-
-  const weeklyCommits = await collector.attempt('stats/commit_activity', async () => {
-    const response = await client.request<unknown>({
-      path: `${base}/stats/commit_activity`,
-    });
-    // GitHub answers 202 with no body while it computes statistics. That is
-    // "not yet known", which must stay null rather than becoming zero commits.
-    if (response.status === 202 || response.data === null) return null;
-
-    const parsed = commitActivitySchema.safeParse(response.data);
-    return parsed.success ? parsed.data.map((week) => week.total) : null;
-  });
-
-  const workflows = await collector.attempt('actions/workflows', async () => {
-    const response = await client.request<unknown>({ path: `${base}/actions/workflows` });
-    return workflowListSchema.safeParse(response.data);
-  });
-
-  const runs = await collector.attempt('actions/runs', async () => {
-    const response = await client.request<unknown>({
-      path: `${base}/actions/runs`,
-      searchParams: {
-        branch: identity.defaultBranch,
-        per_page: SAMPLE_LIMITS.workflowRuns,
-      },
-    });
-    return workflowRunListSchema.safeParse(response.data);
-  });
-
-  const commitStatus = await collector.attempt('commit status', async () => {
-    const response = await client.request<unknown>({
-      path: `${base}/commits/${identity.defaultBranch}/status`,
-    });
-    const parsed = combinedStatusSchema.safeParse(response.data);
-    if (!parsed.success) return null;
-    // `pending` with no checks at all means there is no CI on this commit,
-    // which is different from a check that is still running.
-    return parsed.data.total_count === 0 ? 'none' : parsed.data.state;
-  });
-
-  // Branch protection requires elevated permissions on most repositories.
-  // A 403 here is expected and must stay `null` — "unable to verify" — rather
-  // than being recorded as "not protected".
-  const branchProtected = await collector.attempt('branch protection', async () => {
-    await client.request<unknown>({
-      path: `${base}/branches/${identity.defaultBranch}/protection`,
-    });
-    return true;
-  });
+  const workflowContents = (
+    await Promise.all(
+      workflowFiles.slice(0, SAMPLE_LIMITS.workflowFiles).map((entry) =>
+        collector.attempt(`workflow:${entry.name}`, async () => {
+          // Requested as raw text: GitHub returns the file itself, not JSON.
+          const response = await client.request<string>({
+            path: `${base}/contents/${entry.path}`,
+            accept: 'application/vnd.github.raw',
+            parse: 'text',
+          });
+          return response.data ?? '';
+        }),
+      ),
+    )
+  ).filter((content): content is string => content !== null);
 
   const issueRaws = (issuesResult?.items ?? [])
     .map((item) => issueSchema.safeParse(item))
