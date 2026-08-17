@@ -23,7 +23,9 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
-    "analyze": "tsx scripts/analyze.mts"
+    "analyze": "tsx scripts/analyze.mts",
+    "screenshots": "tsx scripts/screenshots.mts",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",
