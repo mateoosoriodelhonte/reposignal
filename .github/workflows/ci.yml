@@ -26,9 +26,9 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -36,8 +36,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The Prisma schema lands with the persistence work (#20). Until then
+      # there is nothing to generate, and CI should reflect that honestly
+      # rather than fail on a file the project has not reached yet.
       - name: Generate Prisma client
-        run: npx prisma generate
+        run: |
+          if [ -f prisma/schema.prisma ]; then
+            npx prisma generate
+          else
+            echo "No prisma/schema.prisma yet — skipping."
+          fi
 
       - name: Audit dependencies
         run: npm audit --audit-level=high
@@ -51,15 +59,24 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # Coverage thresholds are meaningless with no suites, and would fail on
+      # an empty report. The guard disappears with the first test PR (#23).
       - name: Unit and integration tests
-        run: npm run test:coverage
+        run: |
+          if compgen -G "tests/unit/**/*.test.ts" > /dev/null \
+            || compgen -G "tests/integration/**/*.test.ts" > /dev/null; then
+            npm run test:coverage
+          else
+            echo "No test suites yet — skipping."
+          fi
+        shell: bash
 
       - name: Build
         run: npm run build
 
       - name: Upload coverage
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: coverage/
@@ -73,9 +90,9 @@ jobs:
     needs: verify
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -83,18 +100,32 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The Prisma schema lands with the persistence work (#20). Until then
+      # there is nothing to generate, and CI should reflect that honestly
+      # rather than fail on a file the project has not reached yet.
       - name: Generate Prisma client
-        run: npx prisma generate
+        run: |
+          if [ -f prisma/schema.prisma ]; then
+            npx prisma generate
+          else
+            echo "No prisma/schema.prisma yet — skipping."
+          fi
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
       - name: Run Playwright tests
-        run: npm run test:e2e
+        run: |
+          if compgen -G "tests/e2e/*.spec.ts" > /dev/null; then
+            npm run test:e2e
+          else
+            echo "No E2E specs yet — skipping."
+          fi
+        shell: bash
 
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: playwright-report/

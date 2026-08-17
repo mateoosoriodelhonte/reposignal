@@ -7,6 +7,20 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - dependencies
+    ignore:
+      # Both of these are blocked by transitive dependencies of
+      # eslint-config-next, not by anything in this repository:
+      #
+      #   - TypeScript 7 is rejected outright by typescript-eslint
+      #     ("typescript-eslint does not support TS 7.0").
+      #   - ESLint 10 removes `context.getFilename()`, which the bundled
+      #     eslint-plugin-react still calls, so linting crashes on load.
+      #
+      # Revisit when eslint-config-next ships support for either.
+      - dependency-name: typescript
+        versions: ['>=7']
+      - dependency-name: eslint
+        versions: ['>=10']
     groups:
       # One PR per ecosystem area keeps the review queue legible instead of
       # producing a dozen single-package bumps every week.
