@@ -32,6 +32,14 @@ export const DEFAULT_FRESHNESS_MINUTES = 15;
 
 export interface AnalysisOutcome {
   result: AnalysisResult;
+  /**
+   * The observations the result was derived from.
+   *
+   * Exposed so the UI can draw distributions — the raw ages behind a score,
+   * not a recomputation of it. The scoring boundary is unaffected: charts
+   * render observations, scores come from the tested engine.
+   */
+  snapshot: RepositorySnapshot;
   /** Whether this came from cache, and how old it was. */
   cached: boolean;
   ageSeconds: number;
@@ -146,7 +154,7 @@ export class AnalysisService {
         scoringVersion: result.scoringVersion,
       });
 
-      return { result, cached: false, ageSeconds: 0 };
+      return { result, snapshot, cached: false, ageSeconds: 0 };
     } catch (error) {
       if (isRateLimitError(error)) {
         logger.warn('rate_limit_reached', {
@@ -246,6 +254,11 @@ export class AnalysisService {
       ageSeconds,
     });
 
-    return { result: stored.result, cached: true, ageSeconds };
+    return {
+      result: stored.result,
+      snapshot: stored.snapshot,
+      cached: true,
+      ageSeconds,
+    };
   }
 }

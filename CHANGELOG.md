@@ -13,6 +13,10 @@ analysis records the `scoringVersion` it was produced under.
 
 ### Added
 
+- Distribution charts for open issue age, open pull request age, and commit
+  activity — server-rendered SVG with an equivalent table for assistive
+  technology, omitted entirely where there is too little data to draw one
+
 - Complete documentation: `docs/SCORING.md` documenting every weight,
   threshold, and formula with its rationale and a worked example of weight
   redistribution; `ARCHITECTURE.md`; `docs/LOCAL_DEVELOPMENT.md`; README
