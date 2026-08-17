@@ -83,18 +83,35 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Decided before anything expensive runs. Installing browsers takes
+      # minutes (`--with-deps` shells out to apt), so discovering there is
+      # nothing to test afterwards wastes the entire job.
+      - name: Check for E2E specs
+        id: specs
+        shell: bash
+        run: |
+          if compgen -G "tests/e2e/*.spec.ts" > /dev/null; then
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+            echo 'No E2E specs yet — skipping the rest of this job.'
+          fi
+
       - uses: actions/setup-node@v7
+        if: steps.specs.outputs.present == 'true'
         with:
           node-version: 22
           cache: npm
 
       - name: Install dependencies
+        if: steps.specs.outputs.present == 'true'
         run: npm ci
 
       # The Prisma schema lands with the persistence work (#20). Until then
       # there is nothing to generate, and CI should reflect that honestly
       # rather than fail on a file the project has not reached yet.
       - name: Generate Prisma client
+        if: steps.specs.outputs.present == 'true'
         run: |
           if [ -f prisma/schema.prisma ]; then
             npx prisma generate
@@ -103,19 +120,15 @@ jobs:
           fi
 
       - name: Install Playwright browsers
+        if: steps.specs.outputs.present == 'true'
         run: npx playwright install --with-deps chromium
 
       - name: Run Playwright tests
-        run: |
-          if compgen -G "tests/e2e/*.spec.ts" > /dev/null; then
-            npm run test:e2e
-          else
-            echo "No E2E specs yet — skipping."
-          fi
-        shell: bash
+        if: steps.specs.outputs.present == 'true'
+        run: npm run test:e2e
 
       - name: Upload Playwright report
-        if: ${{ !cancelled() }}
+        if: ${{ steps.specs.outputs.present == 'true' && !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report
