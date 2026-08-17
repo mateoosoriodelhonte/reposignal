@@ -3,16 +3,19 @@ import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 
 import { AnalysisError, PartialDataBanner } from '@/components/analysis-error';
+import { DistributionChart } from '@/components/distribution-chart';
 import { CategoryCard } from '@/components/category-card';
 import { FindingsList } from '@/components/findings';
 import { CategoryScoreBar, OverallScore } from '@/components/score-display';
 import { getAnalysisService } from '@/lib/analysis/container';
+import { bucketAges, bucketWeeklyCommits } from '@/lib/charts/histogram';
 import {
   formatRepositoryReference,
   parseRepositoryReference,
   type RepositoryReference,
 } from '@/lib/validation/repository-reference';
 import type { AnalysisResult } from '@/types/analysis';
+import type { RepositorySnapshot } from '@/types/snapshot';
 
 /**
  * The analysis page.
@@ -83,18 +86,86 @@ async function AnalysisContent({ reference }: { reference: RepositoryReference }
   return (
     <AnalysisReport
       result={outcome.result}
+      snapshot={outcome.snapshot}
       cached={outcome.cached}
       ageSeconds={outcome.ageSeconds}
     />
   );
 }
 
+/**
+ * The distributions behind the scores.
+ *
+ * Each chart is omitted when there is too little data to be worth drawing,
+ * rather than rendered as an empty frame — see `worthCharting`.
+ */
+function Distributions({ snapshot }: { snapshot: RepositorySnapshot }) {
+  const issueAges =
+    snapshot.issues === null ? [] : bucketAges(snapshot.issues.openAgeDays);
+  const prAges =
+    snapshot.pullRequests === null ? [] : bucketAges(snapshot.pullRequests.openAgeDays);
+  const commits =
+    snapshot.activity.weeklyCommits === null
+      ? []
+      : bucketWeeklyCommits(snapshot.activity.weeklyCommits);
+
+  const charts = [
+    issueAges.length > 0 && (
+      <DistributionChart
+        key="issues"
+        buckets={issueAges}
+        title="Open issue age"
+        noun="open issues examined"
+        description="How long the issues in the sample have been open."
+      />
+    ),
+    prAges.length > 0 && (
+      <DistributionChart
+        key="prs"
+        buckets={prAges}
+        title="Open pull request age"
+        noun="open pull requests examined"
+        description="How long the pull requests in the sample have been open."
+      />
+    ),
+    commits.length > 0 && (
+      <DistributionChart
+        key="commits"
+        buckets={commits}
+        title="Commit activity"
+        noun="commits"
+        description="Commits per four-week period over the trailing year."
+      />
+    ),
+  ].filter(Boolean);
+
+  if (charts.length === 0) return null;
+
+  return (
+    <section aria-labelledby="distributions-heading" className="min-w-0">
+      <h2 id="distributions-heading" className="text-xl font-semibold">
+        Distributions
+      </h2>
+      <p className="text-muted mt-1 mb-4 text-sm">
+        The observations behind the scores above. Charts are omitted where there was too
+        little data to draw one meaningfully.
+      </p>
+
+      <div className="border-border-subtle bg-surface-raised flex flex-col gap-8 rounded-lg border p-5">
+        {charts}
+      </div>
+    </section>
+  );
+}
+
 function AnalysisReport({
   result,
+  snapshot,
   cached,
   ageSeconds,
 }: {
   result: AnalysisResult;
+  snapshot: RepositorySnapshot;
   cached: boolean;
   ageSeconds: number;
 }) {
@@ -105,7 +176,7 @@ function AnalysisReport({
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-10 px-6 py-12">
-      <header className="flex flex-col gap-4">
+      <header className="flex min-w-0 flex-col gap-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">
@@ -139,7 +210,10 @@ function AnalysisReport({
 
       <PartialDataBanner limitations={limitations} />
 
-      <section aria-labelledby="categories-heading" className="flex flex-col gap-4">
+      <section
+        aria-labelledby="categories-heading"
+        className="flex min-w-0 flex-col gap-4"
+      >
         <h2 id="categories-heading" className="text-xl font-semibold">
           Category scores
         </h2>
@@ -155,7 +229,7 @@ function AnalysisReport({
         </div>
       </section>
 
-      <section aria-labelledby="overall-method-heading">
+      <section aria-labelledby="overall-method-heading" className="min-w-0">
         <h2 id="overall-method-heading" className="text-xl font-semibold">
           How the overall score was calculated
         </h2>
@@ -240,7 +314,9 @@ function AnalysisReport({
         </div>
       </section>
 
-      <section aria-labelledby="findings-heading">
+      <Distributions snapshot={snapshot} />
+
+      <section aria-labelledby="findings-heading" className="min-w-0">
         <h2 id="findings-heading" className="text-xl font-semibold">
           Highest-priority findings
         </h2>
@@ -254,7 +330,7 @@ function AnalysisReport({
         />
       </section>
 
-      <section aria-labelledby="detail-heading" className="flex flex-col gap-4">
+      <section aria-labelledby="detail-heading" className="flex min-w-0 flex-col gap-4">
         <h2 id="detail-heading" className="text-xl font-semibold">
           Category detail
         </h2>

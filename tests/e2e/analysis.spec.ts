@@ -196,6 +196,10 @@ test.describe('accessibility', () => {
 
   test('the methodology disclosure is keyboard operable', async ({ page }) => {
     await page.goto('/r/acme/toolkit');
+    // The report streams in. Waiting for it before interacting mirrors what a
+    // person does, and avoids toggling a <details> that hydration then
+    // re-renders underneath the assertion.
+    await page.getByText('Engineering health').waitFor();
 
     const summary = page.getByText('How was this calculated?').first();
     await summary.focus();

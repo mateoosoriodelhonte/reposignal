@@ -48,6 +48,15 @@ try {
 
   await page.screenshot({ path: `${OUT}/methodology.png` });
   console.log(`wrote ${OUT}/methodology.png`);
+
+  // The distributions section, cropped to itself.
+  const distributions = page.locator('section', {
+    has: page.getByRole('heading', { name: 'Distributions' }),
+  });
+  if ((await distributions.count()) > 0) {
+    await distributions.first().screenshot({ path: `${OUT}/distributions.png` });
+    console.log(`wrote ${OUT}/distributions.png`);
+  }
 } finally {
   await browser.close();
 }

@@ -91,7 +91,7 @@ function MethodologyTable({ category }: { category: CategoryScore }) {
 export function CategoryCard({ category }: { category: CategoryScore }) {
   return (
     <section
-      className="border-border-subtle bg-surface-raised rounded-lg border p-5"
+      className="border-border-subtle bg-surface-raised min-w-0 rounded-lg border p-5"
       aria-labelledby={`category-${category.key}`}
     >
       <div className="flex items-start justify-between gap-3">
