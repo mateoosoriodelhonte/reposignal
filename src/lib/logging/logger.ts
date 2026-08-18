@@ -19,7 +19,13 @@ export type LogEvent =
   | 'rate_limit_reached'
   | 'cache_hit'
   | 'cache_miss'
-  | 'store_unavailable';
+  | 'store_unavailable'
+  | 'sign_in_started'
+  | 'sign_in_completed'
+  | 'sign_in_failed'
+  | 'sign_out'
+  | 'installation_token_failed'
+  | 'private_analysis';
 
 /**
  * Named fields explicitly admit `undefined` rather than only being optional.

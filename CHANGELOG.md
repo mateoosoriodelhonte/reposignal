@@ -11,6 +11,15 @@ analysis records the `scoringVersion` it was produced under.
 
 ## [Unreleased]
 
+### Added
+
+- Analyze private repositories through a GitHub App. Read-only, per-repository
+  access; the session cookie carries no token; installation tokens are minted
+  per use and never persisted; private analyses are never written to the
+  shared cache
+- The initial database migration, so `prisma migrate deploy` and
+  `npm run db:migrate` work on a fresh database
+
 ## [1.0.0] - 2026-08-17
 
 Initial release. RepoSignal analyzes a public GitHub repository and reports
