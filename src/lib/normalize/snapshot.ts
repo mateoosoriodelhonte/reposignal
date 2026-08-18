@@ -85,6 +85,25 @@ const SECURITY_SCANNERS = [
   'pip-audit',
   'cargo audit',
   'bundler-audit',
+  'sonarsource/sonarcloud-github-action',
+  'sonarsource/sonarqube-scan-action',
+  'checkmarx/ast-github-action',
+  'veracode/veracode-uploadandscan-action',
+  'zaproxy/action-baseline',
+  'zaproxy/action-full-scan',
+  'securego/gosec',
+  'pycqa/bandit',
+  // Bare 'bandit' would fire on any repo that mentions multi-armed bandits, so
+  // the CLI is matched by its recursive-scan flag instead.
+  'bandit -r',
+  // RuboCop is a general linter; only an explicitly security-scoped run counts.
+  // Matches '--only Security' and narrower forms like '--only Security/Eval'.
+  'rubocop --only security',
+  'terrascan',
+  'tfsec',
+  'checkov',
+  'hadolint',
+  'grype',
 ];
 
 export function normalizeIdentity(raw: RawRepository): RepositoryIdentity {

@@ -473,8 +473,46 @@ describe('detectSecurityScanners', () => {
     ['Semgrep', 'uses: semgrep/semgrep-action@v1'],
     ['npm audit', 'run: npm audit --audit-level=high'],
     ['gitleaks', 'uses: gitleaks/gitleaks-action@v2'],
+    ['SonarCloud', 'uses: SonarSource/sonarcloud-github-action@master'],
+    ['SonarQube', 'uses: SonarSource/sonarqube-scan-action@v4'],
+    ['Checkmarx', 'uses: Checkmarx/ast-github-action@main'],
+    ['Veracode', 'uses: veracode/veracode-uploadandscan-action@0.2.6'],
+    ['ZAP baseline', 'uses: zaproxy/action-baseline@v0.12.0'],
+    ['ZAP full scan', 'uses: zaproxy/action-full-scan@v0.10.0'],
+    ['gosec', 'uses: securego/gosec@master'],
+    ['bandit action', 'uses: PyCQA/bandit-action@v1'],
+    ['bandit CLI', 'run: bandit -r src/ -ll'],
+    ['RuboCop security cops', 'run: bundle exec rubocop --only Security'],
+    ['Terrascan', 'uses: tenable/terrascan-action@main'],
+    ['tfsec', 'uses: aquasecurity/tfsec-action@v1.0.0'],
+    ['Checkov', 'uses: bridgecrewio/checkov-action@master'],
+    ['hadolint', 'uses: hadolint/hadolint-action@v3.1.0'],
+    ['grype', 'uses: anchore/grype-action@v0.1.0'],
   ])('detects %s in workflow text', (_label, content) => {
     expect(detectSecurityScanners([content]).length).toBeGreaterThan(0);
+  });
+
+  it.each([
+    ['a multi-armed bandit experiment', 'run: python train.py --bandit-arms 8'],
+    ['an unscoped RuboCop lint run', 'run: bundle exec rubocop --parallel'],
+    ['a Sonar mention in prose', '# see sonarsource docs for setup notes'],
+  ])('does not fire on %s', (_label, content) => {
+    expect(detectSecurityScanners([content])).toEqual([]);
+  });
+
+  it('reports a narrower RuboCop security scope', () => {
+    expect(detectSecurityScanners(['run: rubocop --only Security/Eval'])).toEqual([
+      'rubocop --only security',
+    ]);
+  });
+
+  it('deduplicates a newly added scanner across several workflows', () => {
+    expect(
+      detectSecurityScanners([
+        'uses: hadolint/hadolint-action@v3.1.0',
+        'uses: hadolint/hadolint-action@v3.1.0 # second workflow',
+      ]),
+    ).toEqual(['hadolint']);
   });
 
   it('finds nothing in a workflow without scanning', () => {
