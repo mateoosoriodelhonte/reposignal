@@ -25,7 +25,8 @@ export type LogEvent =
   | 'sign_in_failed'
   | 'sign_out'
   | 'installation_token_failed'
-  | 'private_analysis';
+  | 'private_analysis'
+  | 'refresh_failed';
 
 /**
  * Named fields explicitly admit `undefined` rather than only being optional.

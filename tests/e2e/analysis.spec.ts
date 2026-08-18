@@ -239,6 +239,54 @@ test.describe('responsive layout', () => {
   });
 });
 
+/**
+ * The refresh path.
+ *
+ * Deliberately a single test rather than several. `refreshRateLimiter` is
+ * per-server-process and allows 5 refreshes per 5 minutes, so two tests that
+ * both refresh would share that budget and whichever ran second could be
+ * limited — flaky in exactly the way the rest of this suite avoids. One test
+ * owns the budget and walks it from success to limit.
+ */
+test.describe('manual refresh', () => {
+  test('refreshes on demand, then explains when to try again', async ({ page }) => {
+    await page.goto('/r/acme/toolkit');
+
+    const refresh = page.getByRole('button', { name: 'Refresh' });
+    const status = page.getByRole('status');
+
+    // Sits beside the freshness line rather than somewhere else on the page.
+    await expect(page.getByText(/analyzed/i).first()).toBeVisible();
+    await expect(refresh).toBeVisible();
+
+    // Keyboard operable with a visible focus state.
+    await refresh.focus();
+    await expect(refresh).toBeFocused();
+    await page.keyboard.press('Enter');
+
+    // The report stays on screen and the control returns to idle.
+    await expect(refresh).toBeEnabled();
+    await expect(page.getByRole('heading', { name: 'acme/toolkit' })).toBeVisible();
+    await expect(page.getByText(/scoring algorithm version/i)).toBeVisible();
+
+    // The limiter allows 5 per window; keep going until it says stop. The
+    // bound is the limit plus a couple of attempts, so a regression that
+    // never limits fails here rather than looping.
+    for (let attempt = 0; attempt < 7; attempt += 1) {
+      if ((await status.textContent())?.includes('Refresh limit reached') === true) break;
+      await refresh.click();
+      await expect(refresh).toBeEnabled();
+    }
+
+    // Named a time to try again rather than failing silently.
+    await expect(status).toContainText(/refresh limit reached/i);
+    await expect(status).toContainText(/try again in \d+ (second|minute)s?/i);
+
+    // And the report is still there — a refused refresh does not blank it.
+    await expect(page.getByRole('heading', { name: 'acme/toolkit' })).toBeVisible();
+  });
+});
+
 test.describe('security headers', () => {
   test('sets a nonce-based CSP and the standard hardening headers', async ({ page }) => {
     const response = await page.goto('/');
