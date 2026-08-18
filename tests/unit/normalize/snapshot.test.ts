@@ -452,6 +452,13 @@ describe('detectLockfiles', () => {
     ['go', 'go.sum'],
     ['bundler', 'Gemfile.lock'],
     ['composer', 'composer.lock'],
+    ['swift', 'Package.resolved'],
+    ['deno', 'deno.lock'],
+    ['julia', 'Manifest.toml'],
+    ['r', 'renv.lock'],
+    ['conan', 'conan.lock'],
+    ['cabal', 'cabal.project.freeze'],
+    ['stack', 'stack.yaml.lock'],
   ])('detects the %s lockfile', (_label, name) => {
     expect(detectLockfiles([file(name)])).toEqual([name]);
   });
