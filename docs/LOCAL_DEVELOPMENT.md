@@ -61,6 +61,9 @@ npm run db:migrate
 `prisma generate` runs from `postinstall`; `npm run db:studio` opens Prisma
 Studio if you want to look at stored analyses.
 
+The initial migration is committed under `prisma/migrations`, so `db:migrate`
+applies it rather than asking you to create one.
+
 ## Commands
 
 | Command                         | What it does                           |
