@@ -1,5 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+
+import { currentSession, signInEnabled } from '@/lib/auth';
+
 import './globals.css';
 
 /**
@@ -21,7 +24,9 @@ export const metadata: Metadata = {
     'RepoSignal analyzes public GitHub repositories and reports engineering health with transparent, evidence-backed scoring.',
 };
 
-export default function RootLayout({ children }: LayoutProps<'/'>) {
+export default async function RootLayout({ children }: LayoutProps<'/'>) {
+  const session = await currentSession();
+  const canSignIn = signInEnabled();
   return (
     <html lang="en" className="h-full">
       <body className="flex min-h-full flex-col">
@@ -37,10 +42,38 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
             <Link href="/" className="text-lg font-semibold tracking-tight">
               Repo<span className="text-accent">Signal</span>
             </Link>
-            <nav aria-label="Primary">
+            <nav aria-label="Primary" className="flex items-center gap-4 text-sm">
+              {session !== null ? (
+                <>
+                  <Link
+                    href="/repositories"
+                    className="text-muted hover:text-foreground underline underline-offset-4"
+                  >
+                    Your repositories
+                  </Link>
+                  {/* POST, so another site cannot sign a user out with a link. */}
+                  <form action="/auth/sign-out" method="post">
+                    <button
+                      type="submit"
+                      className="text-muted hover:text-foreground underline underline-offset-4"
+                    >
+                      Sign out
+                    </button>
+                  </form>
+                </>
+              ) : (
+                canSignIn && (
+                  <a
+                    href="/auth/sign-in"
+                    className="text-muted hover:text-foreground underline underline-offset-4"
+                  >
+                    Analyze private repositories
+                  </a>
+                )
+              )}
               <a
                 href="https://github.com/mateoosoriodelhonte/reposignal"
-                className="text-muted hover:text-foreground text-sm underline underline-offset-4"
+                className="text-muted hover:text-foreground underline underline-offset-4"
                 rel="noopener noreferrer"
                 target="_blank"
               >

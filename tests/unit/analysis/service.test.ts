@@ -323,6 +323,109 @@ describe('AnalysisService', () => {
     });
   });
 
+  describe('private repositories', () => {
+    // The service treats an installation-scoped analysis as private. These are
+    // the properties that stop one session's private result reaching another.
+
+    it('never writes a private analysis to the shared store', async () => {
+      const { service, store } = makeService();
+
+      await service.analyze(REF, { installationId: 99, installationToken: 'ghs_x' });
+
+      expect(await store.findIdByFullName('acme/widget')).toBeNull();
+      expect(await store.findLatest(42)).toBeNull();
+    });
+
+    it('never serves a private analysis from the shared store', async () => {
+      // Even if a public analysis of the same repository were cached, a private
+      // request must re-collect under its own installation rather than inherit it.
+      const { service, githubCalls } = makeService();
+
+      await service.analyze(REF);
+      const afterPublic = githubCalls();
+
+      const privateOutcome = await service.analyze(REF, {
+        installationId: 99,
+        installationToken: 'ghs_x',
+      });
+
+      expect(privateOutcome.cached).toBe(false);
+      expect(githubCalls()).toBeGreaterThan(afterPublic);
+    });
+
+    it('does not let a private analysis populate the cache for anonymous users', async () => {
+      const { service, githubCalls } = makeService();
+
+      await service.analyze(REF, { installationId: 99, installationToken: 'ghs_x' });
+      const afterPrivate = githubCalls();
+
+      const anonymous = await service.analyze(REF);
+
+      expect(anonymous.cached).toBe(false);
+      expect(githubCalls()).toBeGreaterThan(afterPrivate);
+    });
+
+    it('does not share an in-flight analysis between two installations', async () => {
+      // Deduplication is keyed on the installation as well as the repository.
+      // Sharing would hand session B the result of session A's access.
+      const { service } = makeService();
+
+      const [a, b] = await Promise.all([
+        service.analyze(REF, { installationId: 1, installationToken: 'ghs_a' }),
+        service.analyze(REF, { installationId: 2, installationToken: 'ghs_b' }),
+      ]);
+
+      expect(a.result.analysisId).not.toBe(b.result.analysisId);
+    });
+
+    it('does not share an in-flight analysis between a session and an anonymous visitor', async () => {
+      const { service } = makeService();
+
+      const [anonymous, authenticated] = await Promise.all([
+        service.analyze(REF),
+        service.analyze(REF, { installationId: 1, installationToken: 'ghs_a' }),
+      ]);
+
+      expect(anonymous.result.analysisId).not.toBe(authenticated.result.analysisId);
+    });
+
+    it('passes the installation token to the GitHub client', async () => {
+      const tokens: Array<string | undefined> = [];
+      const { service } = makeService({
+        createClient: (budget, token) => {
+          tokens.push(token);
+          return stubClient(budget);
+        },
+      });
+
+      await service.analyze(REF, { installationId: 7, installationToken: 'ghs_secret' });
+      expect(tokens).toEqual(['ghs_secret']);
+    });
+
+    it('uses no token for an anonymous analysis', async () => {
+      const tokens: Array<string | undefined> = [];
+      const { service } = makeService({
+        createClient: (budget, token) => {
+          tokens.push(token);
+          return stubClient(budget);
+        },
+      });
+
+      await service.analyze(REF);
+      expect(tokens).toEqual([undefined]);
+    });
+
+    it('never logs the installation token', async () => {
+      const { service, records } = makeService();
+      await service.analyze(REF, {
+        installationId: 7,
+        installationToken: 'ghs_verysecret',
+      });
+
+      expect(JSON.stringify(records)).not.toContain('ghs_verysecret');
+    });
+  });
+
   describe('logging', () => {
     it('logs the start and completion of an analysis with a shared id', async () => {
       const { service, records } = makeService();

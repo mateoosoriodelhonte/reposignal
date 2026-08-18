@@ -73,9 +73,26 @@ that module and asserts none of them says so.
 
 Every threshold and formula is documented in [docs/SCORING.md](docs/SCORING.md).
 
+## Private repositories
+
+RepoSignal can analyze private repositories through a **GitHub App** — not
+"Sign in with GitHub". A classic OAuth App would need the `repo` scope, which
+grants read _and write_ access to every repository the user can reach. A
+GitHub App grants read-only access to the repositories the user explicitly
+selects, and they can revoke it per repository at any time.
+
+The session cookie holds **no GitHub token** — only an installation id,
+encrypted. Tokens are minted per use, expire in an hour, and are never written
+to the database or a log. Authorization is re-checked against GitHub before
+every private analysis rather than trusted from the session, and private
+analyses are never written to the shared cache.
+
+Sign-in is optional: with no App configured, RepoSignal runs as a public-only
+analyzer. Setup is in
+[docs/PRIVATE_REPOSITORIES.md](docs/PRIVATE_REPOSITORIES.md).
+
 ## What it deliberately does not do
 
-- Analyze private repositories
 - Clone, download, or execute repository code
 - Perform vulnerability scanning or credential hunting
 - Use an LLM to produce or adjust any score

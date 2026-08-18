@@ -8,6 +8,7 @@ import { CategoryCard } from '@/components/category-card';
 import { FindingsList } from '@/components/findings';
 import { CategoryScoreBar, OverallScore } from '@/components/score-display';
 import { getAnalysisService } from '@/lib/analysis/container';
+import { currentSession, tokenProvider } from '@/lib/auth';
 import { bucketAges, bucketWeeklyCommits } from '@/lib/charts/histogram';
 import {
   formatRepositoryReference,
@@ -75,10 +76,11 @@ export default async function AnalysisPage(props: PageProps<'/r/[owner]/[reposit
 async function AnalysisContent({ reference }: { reference: RepositoryReference }) {
   const fullName = formatRepositoryReference(reference);
   const service = await getAnalysisService();
+  const access = await resolveAccess(fullName);
 
   let outcome;
   try {
-    outcome = await service.analyze(reference);
+    outcome = await service.analyze(reference, access);
   } catch (error) {
     return <AnalysisError error={error} repository={fullName} />;
   }
@@ -156,6 +158,41 @@ function Distributions({ snapshot }: { snapshot: RepositorySnapshot }) {
       </div>
     </section>
   );
+}
+
+/**
+ * Decides whether this analysis runs anonymously or as an installation.
+ *
+ * The installation is used **only** when GitHub's own repository list for that
+ * installation contains this repository. That check is the authorization
+ * boundary: a signed-in user who types the path of a private repository they
+ * did not grant gets an anonymous analysis, which fails as not-found exactly
+ * as it would for a stranger.
+ *
+ * Falling back to anonymous rather than erroring is deliberate — a signed-in
+ * user analyzing a public repository should not need to have granted it.
+ */
+async function resolveAccess(
+  fullName: string,
+): Promise<{ installationId?: number; installationToken?: string }> {
+  const session = await currentSession();
+  const provider = tokenProvider();
+  if (session === null || provider === null) return {};
+
+  try {
+    const granted = await provider.listRepositories(session.installationId);
+    const match = granted.some(
+      (repository) => repository.fullName.toLowerCase() === fullName.toLowerCase(),
+    );
+    if (!match) return {};
+
+    const { token } = await provider.getToken(session.installationId);
+    return { installationId: session.installationId, installationToken: token };
+  } catch {
+    // A revoked or unreachable installation degrades to anonymous rather than
+    // failing an analysis that may well be public.
+    return {};
+  }
 }
 
 function AnalysisReport({

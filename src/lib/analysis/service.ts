@@ -45,6 +45,21 @@ export interface AnalysisOutcome {
   ageSeconds: number;
 }
 
+export interface AnalyzeOptions {
+  /** Bypass the cache and re-collect from GitHub. */
+  forceRefresh?: boolean;
+  /**
+   * Analyze on behalf of a GitHub App installation.
+   *
+   * Supplying this marks the analysis as private: it is neither read from nor
+   * written to the shared cache, and it is scoped separately for in-flight
+   * deduplication.
+   */
+  installationId?: number;
+  /** Installation access token, minted server-side and never persisted. */
+  installationToken?: string;
+}
+
 export interface AnalysisServiceOptions {
   store: AnalysisStore;
   logger: Logger;
@@ -54,8 +69,13 @@ export interface AnalysisServiceOptions {
   now?: () => Date;
   /** Injected so tests control ids; defaults to a random UUID. */
   generateId?: () => string;
-  /** Injected for tests. */
-  createClient?: (budget: RequestBudget) => GitHubClient;
+  /**
+   * Injected for tests.
+   *
+   * `token` is the installation access token when analyzing a private
+   * repository, and undefined for public analysis.
+   */
+  createClient?: (budget: RequestBudget, token?: string) => GitHubClient;
   /**
    * Serve bundled fixtures instead of calling GitHub.
    *
@@ -90,10 +110,15 @@ export class AnalysisService {
    */
   async analyze(
     reference: RepositoryReference,
-    options: { forceRefresh?: boolean } = {},
+    options: AnalyzeOptions = {},
   ): Promise<AnalysisOutcome> {
     const fullName = formatRepositoryReference(reference);
-    const key = `${fullName.toLowerCase()}:${options.forceRefresh === true}`;
+    // The installation is part of the deduplication key as well as the cache
+    // key: two sessions asking for the same private repository must not share
+    // one in-flight analysis, or the second would receive the first's result
+    // without its own access ever being checked.
+    const scope = options.installationId ?? 'public';
+    const key = `${scope}:${fullName.toLowerCase()}:${options.forceRefresh === true}`;
 
     // Deduplication: ten concurrent visitors to a popular repository should
     // cost one analysis, not ten.
@@ -111,12 +136,18 @@ export class AnalysisService {
   async #analyzeUncached(
     reference: RepositoryReference,
     fullName: string,
-    options: { forceRefresh?: boolean },
+    options: AnalyzeOptions,
   ): Promise<AnalysisOutcome> {
     const { store, logger } = this.options;
     const startedAt = Date.now();
 
-    if (options.forceRefresh !== true) {
+    // A private analysis is never read from or written to the shared store.
+    // The store is keyed on repository identity alone, so a cached private
+    // result would be readable by any session that names the repository —
+    // including one whose installation does not grant it.
+    const cacheable = options.installationId === undefined;
+
+    if (cacheable && options.forceRefresh !== true) {
       const cached = await this.#readCache(fullName);
       if (cached !== null) return cached;
     }
@@ -125,7 +156,10 @@ export class AnalysisService {
     logger.info('analysis_started', { analysisId, repository: fullName });
 
     const budget = new RequestBudget(this.options.requestBudget ?? 40);
-    const client = this.options.createClient?.(budget) ?? new GitHubClient({ budget });
+    const token = options.installationToken;
+    const client =
+      this.options.createClient?.(budget, token) ??
+      new GitHubClient(token === undefined ? { budget } : { budget, token });
 
     try {
       const now = this.#now();
@@ -135,7 +169,7 @@ export class AnalysisService {
       // Persistence failure must not fail an analysis that already succeeded.
       // The user gets their result; the cache simply misses next time.
       try {
-        await store.save({ result, snapshot, createdAt: now });
+        if (cacheable) await store.save({ result, snapshot, createdAt: now });
       } catch (error) {
         logger.warn('store_unavailable', {
           analysisId,
