@@ -19,6 +19,10 @@ const LABEL_WIDTH = 128;
 /** Wide enough for a four-digit commit count without clipping. */
 const VALUE_WIDTH = 52;
 const CHART_WIDTH = 520;
+/** Room under the plot for the max-value tick label. */
+const AXIS_HEIGHT = 16;
+/** Fractions of the maximum to draw a gridline at. */
+const GRID_FRACTIONS = [0.25, 0.5, 0.75, 1];
 
 export function DistributionChart({
   buckets,
@@ -38,7 +42,8 @@ export function DistributionChart({
 
   const max = Math.max(...buckets.map((bucket) => bucket.count), 1);
   const plotWidth = CHART_WIDTH - LABEL_WIDTH - VALUE_WIDTH;
-  const height = buckets.length * (BAR_HEIGHT + BAR_GAP);
+  const plotHeight = buckets.length * (BAR_HEIGHT + BAR_GAP);
+  const height = plotHeight + AXIS_HEIGHT;
   const summary = describeDistribution(buckets, noun);
 
   return (
@@ -63,6 +68,40 @@ export function DistributionChart({
           aria-label={summary}
           className="h-auto max-w-full"
         >
+          {/*
+            Scale reference, drawn first so the bars sit on top of it. Without
+            it a reader can compare bars to each other but has no sense of
+            whether the longest one is 12 or 1,200.
+
+            Only the maximum is labelled. Labelling every gridline would mean
+            inventing "nice" round numbers, and at a small maximum the quarter
+            marks are fractional counts — 0.5 of an issue is worse than no
+            label at all. One absolute anchor plus evenly spaced marks is
+            enough to read the scale off.
+          */}
+          <g aria-hidden="true">
+            {GRID_FRACTIONS.map((fraction) => (
+              <line
+                key={fraction}
+                x1={LABEL_WIDTH + fraction * plotWidth}
+                x2={LABEL_WIDTH + fraction * plotWidth}
+                y1={0}
+                y2={plotHeight}
+                strokeWidth={1}
+                className="stroke-border-subtle"
+              />
+            ))}
+
+            <text
+              x={LABEL_WIDTH + plotWidth}
+              y={plotHeight + AXIS_HEIGHT - 5}
+              textAnchor="end"
+              className="fill-muted text-[10px] tabular-nums"
+            >
+              {max}
+            </text>
+          </g>
+
           {buckets.map((bucket, index) => {
             const y = index * (BAR_HEIGHT + BAR_GAP);
             const width = bucket.count === 0 ? 0 : (bucket.count / max) * plotWidth;
