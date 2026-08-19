@@ -6,6 +6,7 @@ import { AnalysisError, PartialDataBanner } from '@/components/analysis-error';
 import { DistributionChart } from '@/components/distribution-chart';
 import { CategoryCard } from '@/components/category-card';
 import { FindingsList } from '@/components/findings';
+import { RefreshAnalysis } from '@/components/refresh-analysis';
 import { CategoryScoreBar, OverallScore } from '@/components/score-display';
 import { getAnalysisService } from '@/lib/analysis/container';
 import { currentSession, tokenProvider } from '@/lib/auth';
@@ -239,10 +240,18 @@ function AnalysisReport({
           <OverallScore score={overall.score} confidence={overall.confidence} />
         </div>
 
-        <p className="text-muted text-sm">
-          {cached ? <>Analyzed {formatAge(ageSeconds)}.</> : <>Analyzed just now.</>}{' '}
-          Scoring algorithm version {result.scoringVersion}.
-        </p>
+        {/*
+          The refresh control sits beside the age, not inside the paragraph: a
+          <form> is flow content and is not valid inside a <p>, which would end
+          the paragraph early in the parsed DOM.
+        */}
+        <div className="text-muted flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
+          <p>
+            {cached ? <>Analyzed {formatAge(ageSeconds)}.</> : <>Analyzed just now.</>}{' '}
+            Scoring algorithm version {result.scoringVersion}.
+          </p>
+          <RefreshAnalysis repository={repository.fullName} />
+        </div>
       </header>
 
       <PartialDataBanner limitations={limitations} />
