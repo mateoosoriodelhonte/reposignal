@@ -59,6 +59,13 @@ const LOCKFILES = new Set([
   'mix.lock',
   'pubspec.lock',
   'gradle.lockfile',
+  'package.resolved',
+  'deno.lock',
+  'manifest.toml',
+  'renv.lock',
+  'conan.lock',
+  'cabal.project.freeze',
+  'stack.yaml.lock',
 ]);
 
 /**
