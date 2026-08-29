@@ -59,7 +59,42 @@ const LOCKFILES = new Set([
   'mix.lock',
   'pubspec.lock',
   'gradle.lockfile',
+
+  // npm again: `npm shrinkwrap` writes this instead of package-lock.json, and
+  // a package published with one had been reading as having no lockfile at all.
+  'npm-shrinkwrap.json',
+
+  // Apple
+  'package.resolved', // SwiftPM
+  'podfile.lock', // CocoaPods
+  'cartfile.resolved', // Carthage
+
+  // Haskell — the two build tools each have their own
+  'cabal.project.freeze', // cabal freeze
+  'stack.yaml.lock', // Stack
+
+  'manifest.toml', // Julia (Manifest.toml); Gleam uses the same name lowercased
+  'renv.lock', // R, renv
+  'conan.lock', // C/C++, Conan
+  'deno.lock', // Deno
+  'shard.lock', // Crystal, Shards
+  'nimble.lock', // Nim, Nimble
+  'cpanfile.snapshot', // Perl, Carton
+  'conda-lock.yml', // conda-lock
+
+  // Infrastructure and build systems. A repository is scored on whether it
+  // pins what it depends on; a Terraform provider or a Helm chart is a
+  // dependency in exactly that sense.
+  'flake.lock', // Nix flakes
+  '.terraform.lock.hcl', // Terraform providers
+  'chart.lock', // Helm
+  'module.bazel.lock', // Bazel, bzlmod
 ]);
+
+// Deliberately absent: Elm. `elm.json` records version *ranges*, not resolved
+// versions, and `elm-stuff/` is a build cache rather than a manifest — the
+// language ships no lockfile, so counting either would score a repository for
+// something it cannot have.
 
 /**
  * Workflow steps that indicate security scanning.

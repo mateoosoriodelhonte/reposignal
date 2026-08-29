@@ -452,8 +452,44 @@ describe('detectLockfiles', () => {
     ['go', 'go.sum'],
     ['bundler', 'Gemfile.lock'],
     ['composer', 'composer.lock'],
+    // Each of these is its ecosystem's canonical resolved-version file; the
+    // documentation for each is linked in the PR that added it.
+    ['npm shrinkwrap', 'npm-shrinkwrap.json'],
+    ['SwiftPM', 'Package.resolved'],
+    ['CocoaPods', 'Podfile.lock'],
+    ['Carthage', 'Cartfile.resolved'],
+    ['cabal', 'cabal.project.freeze'],
+    ['Stack', 'stack.yaml.lock'],
+    ['Julia', 'Manifest.toml'],
+    ['renv', 'renv.lock'],
+    ['Conan', 'conan.lock'],
+    ['Deno', 'deno.lock'],
+    ['Crystal', 'shard.lock'],
+    ['Nimble', 'nimble.lock'],
+    ['Carton', 'cpanfile.snapshot'],
+    ['conda-lock', 'conda-lock.yml'],
+    ['Nix flakes', 'flake.lock'],
+    ['Terraform', '.terraform.lock.hcl'],
+    ['Helm', 'Chart.lock'],
+    ['Bazel', 'MODULE.bazel.lock'],
   ])('detects the %s lockfile', (_label, name) => {
     expect(detectLockfiles([file(name)])).toEqual([name]);
+  });
+
+  it('matches case-insensitively but reports the name as written', () => {
+    // Julia writes Manifest.toml, Gleam writes manifest.toml, and a Windows
+    // checkout can produce either. The reported name is the repository's.
+    expect(detectLockfiles([file('MANIFEST.TOML')])).toEqual(['MANIFEST.TOML']);
+    expect(detectLockfiles([file('manifest.toml')])).toEqual(['manifest.toml']);
+    expect(detectLockfiles([file('Package.Resolved')])).toEqual(['Package.Resolved']);
+  });
+
+  it('does not count Elm, which has no lockfile', () => {
+    // elm.json records version ranges, not resolved versions, and elm-stuff is
+    // a build cache. Counting either would credit a repository for a file that
+    // cannot exist.
+    expect(detectLockfiles([file('elm.json')])).toEqual([]);
+    expect(detectLockfiles([file('elm-stuff', 0, 'dir')])).toEqual([]);
   });
 
   it('ignores non-lockfiles', () => {
@@ -462,6 +498,25 @@ describe('detectLockfiles', () => {
 
   it('ignores a directory that shares a lockfile name', () => {
     expect(detectLockfiles([file('go.sum', 0, 'dir')])).toEqual([]);
+  });
+
+  it('ignores a directory sharing a newly added lockfile name', () => {
+    // `Package.resolved` and `flake.lock` are plausible directory names in a
+    // vendored checkout, so the type guard has to hold for the additions too.
+    for (const name of ['Package.resolved', 'flake.lock', 'Manifest.toml']) {
+      expect(detectLockfiles([file(name, 0, 'dir')])).toEqual([]);
+    }
+  });
+
+  it('reports every lockfile in a polyglot repository', () => {
+    expect(
+      detectLockfiles([
+        file('package-lock.json'),
+        file('Cargo.lock'),
+        file('flake.lock'),
+        file('README.md'),
+      ]),
+    ).toEqual(['package-lock.json', 'Cargo.lock', 'flake.lock']);
   });
 });
 
